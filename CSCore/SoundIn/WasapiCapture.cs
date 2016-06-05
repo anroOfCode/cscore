@@ -54,6 +54,7 @@ namespace CSCore.SoundIn
         private volatile RecordingState _recordingState;
 
         private int _latency;
+        private int _streamLatency;
         private readonly bool _eventSync;
         private bool _disposed;
 
@@ -178,7 +179,7 @@ namespace CSCore.SoundIn
                 _isInitialized = true;
 
                 Debug.WriteLine(String.Format("Initialized WasapiCapture[Mode: {0}; Latency: {1}; OutputFormat: {2}]",
-                    _shareMode, _latency, _waveFormat));
+                    _shareMode, _streamLatency, _waveFormat));
             }
         }
 
@@ -387,16 +388,16 @@ namespace CSCore.SoundIn
                 else
                 {
                     _audioClient.Initialize(_shareMode, AudioClientStreamFlags.StreamFlagsEventCallback | GetStreamFlags(), 0, 0, _waveFormat, Guid.Empty);
-                    if(_audioClient.StreamLatency > 0) 
-                    {
-                        _latency = (int) (_audioClient.StreamLatency / ReftimesPerMillisecond);
-                    }
                 }
 
                 _eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
                 _audioClient.SetEventHandle(_eventWaitHandle.SafeWaitHandle.DangerousGetHandle());
             }
 
+            if (_audioClient.StreamLatency > 0)
+            {
+                _streamLatency = (int)(_audioClient.StreamLatency / ReftimesPerMillisecond);
+            }
             _audioCaptureClient = AudioCaptureClient.FromAudioClient(_audioClient);
         }
 
@@ -469,6 +470,19 @@ namespace CSCore.SoundIn
         public long DebuggingId
         {
             get { return _audioCaptureClient != null ? _audioCaptureClient.BasePtr.ToInt64() : -1; }
+        }
+
+        /// <summary>
+        /// The stream latency as reported from the CoreAudio APIs, this value
+        /// represents the total latency of the audio graph channel, in milliseconds.
+        /// </summary>
+        public int StreamLatency
+        {
+            get
+            {
+                CheckForInitialized();
+                return _streamLatency;
+            }
         }
 
         private WaveFormat SetupWaveFormat(WaveFormat waveFormat, AudioClient audioClient)
